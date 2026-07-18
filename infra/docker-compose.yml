@@ -52,6 +52,34 @@ services:
     volumes:
       - ./elasticmq.conf:/opt/elasticmq.conf:ro
 
+  catalog-service:
+    build:
+      context: ../services/catalog-service
+    environment:
+      DATABASE_URL: "mssql+pymssql://sa:${MSSQL_SA_PASSWORD}@sqlserver:1433/catalog_service"
+      SQS_ENDPOINT_URL: "http://elasticmq:9324"
+      PRICING_QUEUE_URL: "http://elasticmq:9324/000000000000/pricing-invalidation-queue"
+      CORS_ORIGINS: '["http://localhost:5173"]'
+    ports:
+      - "5004:5004"
+    depends_on:
+      sqlserver:
+        condition: service_healthy
+      elasticmq:
+        condition: service_started
+
+  inventory-service:
+    build:
+      context: ../services/inventory-service
+    environment:
+      DATABASE_URL: "mssql+pymssql://sa:${MSSQL_SA_PASSWORD}@sqlserver:1433/inventory_service"
+      CORS_ORIGINS: '["http://localhost:5173"]'
+    ports:
+      - "5005:5005"
+    depends_on:
+      sqlserver:
+        condition: service_healthy
+
 volumes:
   sqlserver-data:
   mongodb-data:
