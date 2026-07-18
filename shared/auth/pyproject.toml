@@ -1,0 +1,20 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "supplyforge-auth"
+version = "0.1.0"
+description = "Shared auth primitives (password hashing, TOTP, session tokens) for SupplyForge services"
+requires-python = ">=3.12"
+dependencies = [
+    "argon2-cffi>=23.1.0",
+    "pyotp>=2.9.0",
+    "redis>=5.0.0",
+]
+
+[project.optional-dependencies]
+dev = ["pytest>=8.0.0", "fakeredis>=2.20.0"]
+
+[tool.setuptools.packages.find]
+where = ["src"]
