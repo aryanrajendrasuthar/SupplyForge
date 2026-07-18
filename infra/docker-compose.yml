@@ -80,6 +80,18 @@ services:
       sqlserver:
         condition: service_healthy
 
+  supplier-service:
+    build:
+      context: ../services/supplier-service
+    environment:
+      DATABASE_URL: "mssql+pymssql://sa:${MSSQL_SA_PASSWORD}@sqlserver:1433/supplier_service"
+      CORS_ORIGINS: '["http://localhost:5173"]'
+    ports:
+      - "5001:5001"
+    depends_on:
+      sqlserver:
+        condition: service_healthy
+
 volumes:
   sqlserver-data:
   mongodb-data:
