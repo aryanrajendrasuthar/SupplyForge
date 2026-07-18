@@ -73,12 +73,35 @@ services:
       context: ../services/inventory-service
     environment:
       DATABASE_URL: "mssql+pymssql://sa:${MSSQL_SA_PASSWORD}@sqlserver:1433/inventory_service"
+      SQS_ENDPOINT_URL: "http://elasticmq:9324"
+      RESERVATION_QUEUE_URL: "http://elasticmq:9324/000000000000/inventory-reservation-queue"
+      ORDER_STATUS_QUEUE_URL: "http://elasticmq:9324/000000000000/order-status-queue"
       CORS_ORIGINS: '["http://localhost:5173"]'
     ports:
       - "5005:5005"
     depends_on:
       sqlserver:
         condition: service_healthy
+      elasticmq:
+        condition: service_started
+
+  # Saga consumer: reserves stock for order.created events, publishes the
+  # result back to order-status-queue. Same image as inventory-service, just
+  # running the polling loop instead of gunicorn.
+  inventory-service-consumer:
+    build:
+      context: ../services/inventory-service
+    command: ["python", "-m", "app.consumer"]
+    environment:
+      DATABASE_URL: "mssql+pymssql://sa:${MSSQL_SA_PASSWORD}@sqlserver:1433/inventory_service"
+      SQS_ENDPOINT_URL: "http://elasticmq:9324"
+      RESERVATION_QUEUE_URL: "http://elasticmq:9324/000000000000/inventory-reservation-queue"
+      ORDER_STATUS_QUEUE_URL: "http://elasticmq:9324/000000000000/order-status-queue"
+    depends_on:
+      sqlserver:
+        condition: service_healthy
+      elasticmq:
+        condition: service_started
 
   supplier-service:
     build:
@@ -91,6 +114,41 @@ services:
     depends_on:
       sqlserver:
         condition: service_healthy
+
+  order-service:
+    build:
+      context: ../services/order-service
+    environment:
+      DATABASE_URL: "mssql+pymssql://sa:${MSSQL_SA_PASSWORD}@sqlserver:1433/order_service"
+      SQS_ENDPOINT_URL: "http://elasticmq:9324"
+      RESERVATION_QUEUE_URL: "http://elasticmq:9324/000000000000/inventory-reservation-queue"
+      ORDER_STATUS_QUEUE_URL: "http://elasticmq:9324/000000000000/order-status-queue"
+      CORS_ORIGINS: '["http://localhost:5173"]'
+    ports:
+      - "5002:5002"
+    depends_on:
+      sqlserver:
+        condition: service_healthy
+      elasticmq:
+        condition: service_started
+
+  # Saga consumer: applies inventory.reserved / inventory.reservation_failed
+  # events to the matching order. Same image as order-service, just running
+  # the polling loop instead of gunicorn.
+  order-service-consumer:
+    build:
+      context: ../services/order-service
+    command: ["python", "-m", "app.consumer"]
+    environment:
+      DATABASE_URL: "mssql+pymssql://sa:${MSSQL_SA_PASSWORD}@sqlserver:1433/order_service"
+      SQS_ENDPOINT_URL: "http://elasticmq:9324"
+      RESERVATION_QUEUE_URL: "http://elasticmq:9324/000000000000/inventory-reservation-queue"
+      ORDER_STATUS_QUEUE_URL: "http://elasticmq:9324/000000000000/order-status-queue"
+    depends_on:
+      sqlserver:
+        condition: service_healthy
+      elasticmq:
+        condition: service_started
 
 volumes:
   sqlserver-data:
