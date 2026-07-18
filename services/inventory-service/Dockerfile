@@ -7,5 +7,9 @@ RUN pip install --no-cache-dir -r requirements.txt
 
 COPY . .
 
+RUN useradd --create-home --uid 1000 appuser && chown -R appuser:appuser /app
+USER appuser
+
+
 EXPOSE 5005
 CMD ["gunicorn", "-b", "0.0.0.0:5005", "app:create_app()"]
