@@ -150,6 +150,52 @@ services:
       elasticmq:
         condition: service_started
 
+  ingestion-service:
+    build:
+      context: ../services/ingestion-service
+    environment:
+      MONGO_URL: "mongodb://${MONGO_ROOT_USER:-root}:${MONGO_ROOT_PASSWORD}@mongodb:27017"
+      SQS_ENDPOINT_URL: "http://elasticmq:9324"
+      AI_VALIDATION_QUEUE_URL: "http://elasticmq:9324/000000000000/ai-validation-queue"
+      VALIDATION_RESULT_QUEUE_URL: "http://elasticmq:9324/000000000000/validation-result-queue"
+      CORS_ORIGINS: '["http://localhost:5173"]'
+    ports:
+      - "5003:5003"
+    depends_on:
+      mongodb:
+        condition: service_healthy
+      elasticmq:
+        condition: service_started
+
+  # Applies validation.completed events (from ai-validation-worker) back onto
+  # their record. Same image as ingestion-service, running the polling loop.
+  ingestion-service-consumer:
+    build:
+      context: ../services/ingestion-service
+    command: ["python", "-m", "app.consumer"]
+    environment:
+      MONGO_URL: "mongodb://${MONGO_ROOT_USER:-root}:${MONGO_ROOT_PASSWORD}@mongodb:27017"
+      SQS_ENDPOINT_URL: "http://elasticmq:9324"
+      AI_VALIDATION_QUEUE_URL: "http://elasticmq:9324/000000000000/ai-validation-queue"
+      VALIDATION_RESULT_QUEUE_URL: "http://elasticmq:9324/000000000000/validation-result-queue"
+    depends_on:
+      mongodb:
+        condition: service_healthy
+      elasticmq:
+        condition: service_started
+
+  ai-validation-worker:
+    build:
+      context: ../services/ai-validation-worker
+    environment:
+      SQS_ENDPOINT_URL: "http://elasticmq:9324"
+      AI_VALIDATION_QUEUE_URL: "http://elasticmq:9324/000000000000/ai-validation-queue"
+      VALIDATION_RESULT_QUEUE_URL: "http://elasticmq:9324/000000000000/validation-result-queue"
+      GROQ_API_KEY: "${GROQ_API_KEY:-}"
+    depends_on:
+      elasticmq:
+        condition: service_started
+
 volumes:
   sqlserver-data:
   mongodb-data:

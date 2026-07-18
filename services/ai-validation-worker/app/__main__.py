@@ -1,6 +1,4 @@
-def main() -> None:
-    print("ai-validation-worker: SQS consumer loop not implemented yet (Phase 4)")
-
+from app.consumer import run
 
 if __name__ == "__main__":
-    main()
+    run()
