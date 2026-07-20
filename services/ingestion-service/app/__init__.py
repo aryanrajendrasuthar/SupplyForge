@@ -3,6 +3,8 @@ import uuid
 import sentry_sdk
 from flask import Flask, g, request
 from flask_cors import CORS
+from flask_limiter import Limiter
+from flask_limiter.util import get_remote_address
 
 from app.config import settings
 from app.db import make_records_collection
@@ -22,6 +24,13 @@ def create_app(records_collection=None) -> Flask:
     )
     app.event_publisher = SqsEventPublisher(
         make_sqs_client(settings.sqs_endpoint_url), settings.ai_validation_queue_url
+    )
+
+    Limiter(
+        app=app,
+        key_func=get_remote_address,
+        storage_uri=settings.redis_url,
+        default_limits=[settings.rate_limit_default],
     )
 
     @app.before_request

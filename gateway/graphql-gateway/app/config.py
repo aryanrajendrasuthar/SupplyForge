@@ -10,12 +10,18 @@ class Settings(BaseSettings):
 
     # Resolver-level aggregation calls each service's own REST API — the
     # gateway never touches another service's database directly (see
-    # docs/architecture.md). No resolver-level auth yet: that's wired in
-    # Phase 6 alongside session/role auth in every other service.
+    # docs/architecture.md). Auth is enforced at each backend service (see
+    # require_session() there); the gateway's job is just to forward the
+    # caller's session cookie along (see app/clients.py), not re-check it.
     catalog_service_url: str = "http://localhost:5004"
     inventory_service_url: str = "http://localhost:5005"
     supplier_service_url: str = "http://localhost:5001"
     order_service_url: str = "http://localhost:5002"
+
+    # Rate-limit counters. docker-compose supplies the real authenticated
+    # Redis URL via env var; this default assumes a no-auth local Redis.
+    redis_url: str = "redis://localhost:6380/0"
+    rate_limit_default: str = "200 per hour"
 
 
 settings = Settings()

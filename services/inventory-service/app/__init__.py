@@ -1,15 +1,19 @@
 import uuid
 
+import redis
 import sentry_sdk
 from flask import Flask, g, request
 from flask_cors import CORS
+from flask_limiter import Limiter
+from flask_limiter.util import get_remote_address
+from supplyforge_auth import SessionStore
 
 from app.config import settings
 from app.db import create_all_safely, make_session_factory
 from app.routes import bp as inventory_bp
 
 
-def create_app() -> Flask:
+def create_app(redis_client=None) -> Flask:
     if settings.sentry_dsn:
         sentry_sdk.init(dsn=settings.sentry_dsn, traces_sample_rate=0.1)
 
@@ -19,6 +23,16 @@ def create_app() -> Flask:
     engine, session_factory = make_session_factory(settings.database_url)
     create_all_safely(engine)
     app.session_factory = session_factory
+
+    redis_client = redis_client or redis.Redis.from_url(settings.redis_url)
+    app.session_store = SessionStore(redis_client)
+
+    Limiter(
+        app=app,
+        key_func=get_remote_address,
+        storage_uri=settings.redis_url,
+        default_limits=[settings.rate_limit_default],
+    )
 
     @app.before_request
     def _start_request():

@@ -1,11 +1,13 @@
 flask>=3.0.0
 flask-cors>=4.0.0
+flask-limiter>=3.5.0
 pydantic>=2.6.0
 pydantic-settings>=2.2.0
 sentry-sdk[flask]>=1.40.0
 gunicorn>=21.2.0
 pymongo>=4.6.0
 boto3>=1.34.0
+redis>=5.0.0
 
 pytest>=8.0.0
 mongomock>=4.1.0

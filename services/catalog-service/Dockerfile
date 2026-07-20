@@ -4,16 +4,20 @@ FROM python:3.12-slim
 # instead of only after the buffer fills or the process exits.
 ENV PYTHONUNBUFFERED=1
 
-WORKDIR /app
+# Build context is the repo root (not this directory) so shared/auth can be
+# copied in alongside the service — the monorepo layout is preserved inside
+# the image so requirements.txt's `-e ../../shared/auth` resolves exactly
+# the same way it does in local dev.
+WORKDIR /repo
 
-COPY requirements.txt .
+COPY shared/auth shared/auth
+COPY services/catalog-service services/catalog-service
+
+WORKDIR /repo/services/catalog-service
 RUN pip install --no-cache-dir -r requirements.txt
 
-COPY . .
-
-RUN useradd --create-home --uid 1000 appuser && chown -R appuser:appuser /app
+RUN useradd --create-home --uid 1000 appuser && chown -R appuser:appuser /repo
 USER appuser
-
 
 EXPOSE 5004
 CMD ["gunicorn", "-b", "0.0.0.0:5004", "app:create_app()"]

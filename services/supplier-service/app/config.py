@@ -12,5 +12,13 @@ class Settings(BaseSettings):
     # (see tests/conftest.py) so CI doesn't need a live database.
     database_url: str = "mssql+pymssql://sa:ChangeMe_Dev123!@localhost:1433/supplier_service"
 
+    # Sessions + rate-limit counters. docker-compose supplies the real
+    # authenticated URL via env var; this default assumes a no-auth local
+    # Redis. Tests inject a fakeredis client directly (see tests/conftest.py)
+    # rather than using this setting at all.
+    redis_url: str = "redis://localhost:6380/0"
+    rate_limit_default: str = "200 per hour"
+    rate_limit_auth: str = "10 per 15 minutes"
+
 
 settings = Settings()

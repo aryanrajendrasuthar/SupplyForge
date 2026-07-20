@@ -1,4 +1,4 @@
-const GATEWAY_URL = import.meta.env.VITE_GATEWAY_URL ?? "http://localhost:5000/graphql";
+const GATEWAY_URL = import.meta.env.VITE_GATEWAY_URL ?? "http://localhost:5050/graphql";
 
 interface GraphQLError {
   message: string;
@@ -13,6 +13,7 @@ export async function graphqlRequest<T>(query: string, variables?: Record<string
   const response = await fetch(GATEWAY_URL, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
+    credentials: "include", // sends the session cookie set by supplier-service's /auth/login
     body: JSON.stringify({ query, variables }),
   });
 

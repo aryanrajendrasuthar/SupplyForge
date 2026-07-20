@@ -2,6 +2,7 @@ from flask import Blueprint, current_app, g, jsonify, request
 from pydantic import ValidationError
 from sqlalchemy import select
 from sqlalchemy.exc import IntegrityError
+from supplyforge_auth import require_session
 
 from app.bulk_import import parse_bulk_import
 from app.models import PricingTier, Sku
@@ -19,6 +20,7 @@ def _get_sku(db, sku_code: str) -> Sku | None:
 
 
 @bp.post("")
+@require_session()
 def create_sku():
     try:
         payload = SkuCreate.model_validate(request.get_json(force=True))
@@ -71,6 +73,7 @@ def get_sku(sku_code: str):
 
 
 @bp.patch("/<sku_code>")
+@require_session()
 def update_sku(sku_code: str):
     try:
         payload = SkuUpdate.model_validate(request.get_json(force=True))
@@ -106,6 +109,7 @@ def update_sku(sku_code: str):
 
 
 @bp.delete("/<sku_code>")
+@require_session()
 def deactivate_sku(sku_code: str):
     db = g.db
     sku = _get_sku(db, sku_code)
@@ -117,6 +121,7 @@ def deactivate_sku(sku_code: str):
 
 
 @bp.post("/bulk-import")
+@require_session()
 def bulk_import():
     file = request.files.get("file")
     if file is None:

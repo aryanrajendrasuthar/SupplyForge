@@ -2,6 +2,7 @@ from flask import Blueprint, g, jsonify, request
 from pydantic import ValidationError
 from sqlalchemy import select
 from sqlalchemy.exc import IntegrityError
+from supplyforge_auth import require_session
 
 from app.models import Reservation, StockItem, Warehouse
 from app.reservation_service import (
@@ -19,6 +20,7 @@ bp = Blueprint("inventory", __name__)
 
 
 @bp.post("/warehouses")
+@require_session()
 def create_warehouse():
     try:
         payload = WarehouseCreate.model_validate(request.get_json(force=True))
@@ -54,6 +56,7 @@ def _stock_item_out(item: StockItem) -> dict:
 
 
 @bp.post("/stock")
+@require_session()
 def create_stock_item():
     try:
         payload = StockItemCreate.model_validate(request.get_json(force=True))
@@ -111,6 +114,11 @@ def _reservation_out(reservation: Reservation) -> dict:
     }
 
 
+# Reservation endpoints are saga-internal (see app/saga.py and
+# order-service's consumer) rather than user-facing, so they're not
+# session-gated the way warehouse/stock setup is — the caller here is
+# always the order/inventory saga machinery, identified by which SQS
+# messages it's reacting to, not a logged-in operator.
 @bp.post("/reservations")
 def create_reservation():
     try:

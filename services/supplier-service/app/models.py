@@ -10,6 +10,21 @@ def _utcnow() -> datetime:
     return datetime.now(timezone.utc)
 
 
+class User(Base):
+    """Internal operator account (analyst / approver / admin) — not a
+    supplier's own login. Suppliers don't authenticate against this service;
+    they're managed *by* these users through the approval workflow."""
+
+    __tablename__ = "users"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    email: Mapped[str] = mapped_column(String(255), unique=True, index=True)
+    password_hash: Mapped[str] = mapped_column(String(255))
+    totp_secret: Mapped[str | None] = mapped_column(String(64), nullable=True)
+    role: Mapped[str] = mapped_column(String(32), default="analyst")  # analyst | approver | admin
+    created_at: Mapped[datetime] = mapped_column(default=_utcnow)
+
+
 class Supplier(Base):
     __tablename__ = "suppliers"
 

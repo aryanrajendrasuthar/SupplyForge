@@ -1,16 +1,25 @@
 import requests
+from flask import request
 
 from app.config import settings
 
 
+def _forwarded_cookies() -> dict:
+    """Forwards the caller's session cookie to the backend service being
+    proxied to — the gateway doesn't enforce auth itself, each backend
+    service does (see require_session() there), so the cookie has to reach
+    it or every gated mutation would 401 through the gateway."""
+    return dict(request.cookies)
+
+
 def _get(base_url: str, path: str, params: dict | None = None):
-    response = requests.get(f"{base_url}{path}", params=params, timeout=10)
+    response = requests.get(f"{base_url}{path}", params=params, cookies=_forwarded_cookies(), timeout=10)
     response.raise_for_status()
     return response.json()
 
 
 def _post(base_url: str, path: str, json_body: dict) -> dict:
-    response = requests.post(f"{base_url}{path}", json=json_body, timeout=10)
+    response = requests.post(f"{base_url}{path}", json=json_body, cookies=_forwarded_cookies(), timeout=10)
     response.raise_for_status()
     return response.json()
 

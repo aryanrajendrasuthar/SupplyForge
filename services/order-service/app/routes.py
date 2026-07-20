@@ -1,6 +1,7 @@
 from flask import Blueprint, current_app, g, jsonify, request
 from pydantic import ValidationError
 from sqlalchemy import select
+from supplyforge_auth import require_session
 
 from app.models import Order
 from app.saga import create_order
@@ -23,6 +24,7 @@ def _order_out(order: Order) -> dict:
 
 
 @bp.post("")
+@require_session()
 def create():
     try:
         payload = OrderCreate.model_validate(request.get_json(force=True))

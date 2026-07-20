@@ -20,5 +20,13 @@ class Settings(BaseSettings):
     ai_validation_queue_url: str = "http://localhost:9324/000000000000/ai-validation-queue"
     validation_result_queue_url: str = "http://localhost:9324/000000000000/validation-result-queue"
 
+    # Rate-limit counters only — ingestion endpoints aren't session-gated
+    # (this is the intake point for external systems pushing records, not an
+    # internal-operator UI, so a user login doesn't fit the caller model).
+    # docker-compose supplies the real authenticated Redis URL via env var;
+    # this default assumes a no-auth local Redis.
+    redis_url: str = "redis://localhost:6380/0"
+    rate_limit_default: str = "200 per hour"
+
 
 settings = Settings()

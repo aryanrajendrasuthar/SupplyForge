@@ -1,6 +1,7 @@
 from flask import Blueprint, g, jsonify, request
 from pydantic import ValidationError
 from sqlalchemy import select
+from supplyforge_auth import require_session
 
 from app.lifecycle import (
     InvalidTransitionError,
@@ -13,7 +14,7 @@ from app.lifecycle import (
     submit_for_review,
 )
 from app.models import Supplier
-from app.schemas import SupplierApprove, SupplierDeactivate, SupplierReject, SupplierRegister
+from app.schemas import SupplierDeactivate, SupplierReject, SupplierRegister
 
 bp = Blueprint("suppliers", __name__, url_prefix="/suppliers")
 
@@ -104,22 +105,20 @@ def submit(supplier_id: int):
 
 
 @bp.post("/<int:supplier_id>/approve")
+@require_session(role="approver")
 def approve_supplier(supplier_id: int):
     supplier = _get_supplier(supplier_id)
     if supplier is None:
         return jsonify({"error": "not found"}), 404
     try:
-        payload = SupplierApprove.model_validate(request.get_json(force=True))
-    except ValidationError as exc:
-        return jsonify({"errors": exc.errors()}), 400
-    try:
-        approve(g.db, supplier, payload.approved_by)
+        approve(g.db, supplier, g.current_user["email"])
     except InvalidTransitionError as exc:
         return jsonify({"error": str(exc)}), 409
     return jsonify(_supplier_out(supplier))
 
 
 @bp.post("/<int:supplier_id>/reject")
+@require_session(role="approver")
 def reject_supplier(supplier_id: int):
     supplier = _get_supplier(supplier_id)
     if supplier is None:
@@ -129,13 +128,14 @@ def reject_supplier(supplier_id: int):
     except ValidationError as exc:
         return jsonify({"errors": exc.errors()}), 400
     try:
-        reject(g.db, supplier, payload.rejected_by, payload.reason)
+        reject(g.db, supplier, g.current_user["email"], payload.reason)
     except InvalidTransitionError as exc:
         return jsonify({"error": str(exc)}), 409
     return jsonify(_supplier_out(supplier))
 
 
 @bp.post("/<int:supplier_id>/deactivate")
+@require_session(role="approver")
 def deactivate_supplier(supplier_id: int):
     supplier = _get_supplier(supplier_id)
     if supplier is None:
@@ -145,7 +145,7 @@ def deactivate_supplier(supplier_id: int):
     except ValidationError as exc:
         return jsonify({"errors": exc.errors()}), 400
     try:
-        deactivate(g.db, supplier, payload.deactivated_by, payload.reason)
+        deactivate(g.db, supplier, g.current_user["email"], payload.reason)
     except InvalidTransitionError as exc:
         return jsonify({"error": str(exc)}), 409
     return jsonify(_supplier_out(supplier))
@@ -168,3 +168,50 @@ def audit_log(supplier_id: int):
             for e in supplier.audit_entries
         ]
     )
+
+
+@bp.get("/<int:supplier_id>/export")
+@require_session()
+def export_supplier(supplier_id: int):
+    """Right-to-export: the full record a supplier or auditor can request."""
+    supplier = _get_supplier(supplier_id)
+    if supplier is None:
+        return jsonify({"error": "not found"}), 404
+    return jsonify(
+        {
+            **_supplier_out(supplier),
+            "documents": [
+                {"id": d.id, "document_type": d.document_type, "filename": d.filename}
+                for d in supplier.documents
+            ],
+            "audit_log": [
+                {
+                    "previous_status": e.previous_status,
+                    "new_status": e.new_status,
+                    "actor": e.actor,
+                    "reason": e.reason,
+                    "created_at": e.created_at.isoformat(),
+                }
+                for e in supplier.audit_entries
+            ],
+        }
+    )
+
+
+@bp.post("/<int:supplier_id>/erase")
+@require_session(role="admin")
+def erase_supplier(supplier_id: int):
+    """Right-to-erase: scrubs PII (contact details, document bytes) but keeps
+    the row and audit trail — erasing the audit trail itself would defeat
+    the compliance/traceability purpose it exists for."""
+    supplier = _get_supplier(supplier_id)
+    if supplier is None:
+        return jsonify({"error": "not found"}), 404
+
+    supplier.legal_name = "[erased]"
+    supplier.contact_email = f"erased-{supplier.id}@example.invalid"
+    supplier.contact_phone = None
+    for document in supplier.documents:
+        document.content = b""
+    g.db.commit()
+    return jsonify({"status": "erased"})

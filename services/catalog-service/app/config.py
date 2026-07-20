@@ -17,5 +17,13 @@ class Settings(BaseSettings):
     sqs_endpoint_url: str = "http://localhost:9324"
     pricing_queue_url: str = "http://localhost:9324/000000000000/pricing-invalidation-queue"
 
+    # Session validation (sessions are created by supplier-service's
+    # /auth/login — every service resolves them off the same Redis, no
+    # shared Users table) and rate-limit counters. docker-compose supplies
+    # the real authenticated URL via env var; this default assumes a no-auth
+    # local Redis. Tests inject a fakeredis client directly.
+    redis_url: str = "redis://localhost:6380/0"
+    rate_limit_default: str = "200 per hour"
+
 
 settings = Settings()

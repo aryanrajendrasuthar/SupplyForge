@@ -3,6 +3,8 @@ from ariadne import graphql_sync
 from ariadne.explorer import ExplorerGraphiQL
 from flask import Flask, jsonify, request
 from flask_cors import CORS
+from flask_limiter import Limiter
+from flask_limiter.util import get_remote_address
 
 from app.config import settings
 from app.schema import schema
@@ -16,6 +18,13 @@ def create_app() -> Flask:
 
     app = Flask(__name__)
     CORS(app, origins=settings.cors_origins, supports_credentials=True)
+
+    Limiter(
+        app=app,
+        key_func=get_remote_address,
+        storage_uri=settings.redis_url,
+        default_limits=[settings.rate_limit_default],
+    )
 
     @app.get("/graphql")
     def graphql_explorer():

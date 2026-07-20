@@ -1,6 +1,7 @@
+import pytest
 import requests
 
-from app import clients
+from app import clients, create_app
 from app.config import settings
 
 
@@ -18,12 +19,25 @@ class FakeResponse:
         return self._json_body
 
 
-def test_fetch_skus_hits_catalog_service_and_unwraps_items(monkeypatch):
+@pytest.fixture
+def request_context():
+    # flask-limiter's in-memory backend — no live Redis needed in CI.
+    settings.redis_url = "memory://"
+    # clients.py reads request.cookies to forward the caller's session to
+    # the backend service — needs an active Flask request context, unlike a
+    # bare function call.
+    app = create_app()
+    with app.test_request_context(headers={"Cookie": "sf_session=test-token"}):
+        yield
+
+
+def test_fetch_skus_hits_catalog_service_and_unwraps_items(monkeypatch, request_context):
     captured = {}
 
-    def fake_get(url, params, timeout):
+    def fake_get(url, params, cookies, timeout):
         captured["url"] = url
         captured["params"] = params
+        captured["cookies"] = cookies
         return FakeResponse({"items": [{"sku": "WIDGET-1"}], "page": 1, "page_size": 25})
 
     monkeypatch.setattr(requests, "get", fake_get)
@@ -32,11 +46,12 @@ def test_fetch_skus_hits_catalog_service_and_unwraps_items(monkeypatch):
 
     assert captured["url"] == f"{settings.catalog_service_url}/skus"
     assert captured["params"] == {"category": "widgets"}
+    assert captured["cookies"] == {"sf_session": "test-token"}
     assert result == [{"sku": "WIDGET-1"}]
 
 
-def test_fetch_sku_returns_none_on_404(monkeypatch):
-    def fake_get(url, params, timeout):
+def test_fetch_sku_returns_none_on_404(monkeypatch, request_context):
+    def fake_get(url, params, cookies, timeout):
         return FakeResponse({"error": "not found"}, status_code=404)
 
     monkeypatch.setattr(requests, "get", fake_get)
@@ -44,8 +59,8 @@ def test_fetch_sku_returns_none_on_404(monkeypatch):
     assert clients.fetch_sku("NOPE") is None
 
 
-def test_fetch_sku_reraises_non_404_errors(monkeypatch):
-    def fake_get(url, params, timeout):
+def test_fetch_sku_reraises_non_404_errors(monkeypatch, request_context):
+    def fake_get(url, params, cookies, timeout):
         return FakeResponse({"error": "boom"}, status_code=500)
 
     monkeypatch.setattr(requests, "get", fake_get)
@@ -59,12 +74,13 @@ def test_fetch_sku_reraises_non_404_errors(monkeypatch):
     assert raised
 
 
-def test_create_order_posts_payload(monkeypatch):
+def test_create_order_posts_payload_and_forwards_session_cookie(monkeypatch, request_context):
     captured = {}
 
-    def fake_post(url, json, timeout):
+    def fake_post(url, json, cookies, timeout):
         captured["url"] = url
         captured["json"] = json
+        captured["cookies"] = cookies
         return FakeResponse({"id": 1, **json, "status": "pending"})
 
     monkeypatch.setattr(requests, "post", fake_post)
@@ -73,4 +89,5 @@ def test_create_order_posts_payload(monkeypatch):
     result = clients.create_order(payload)
 
     assert captured["url"] == f"{settings.order_service_url}/orders"
+    assert captured["cookies"] == {"sf_session": "test-token"}
     assert result["status"] == "pending"

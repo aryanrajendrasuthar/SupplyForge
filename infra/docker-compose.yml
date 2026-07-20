@@ -75,11 +75,13 @@ services:
 
   catalog-service:
     build:
-      context: ../services/catalog-service
+      context: ..
+      dockerfile: services/catalog-service/Dockerfile
     environment:
       DATABASE_URL: "mssql+pymssql://sa:${MSSQL_SA_PASSWORD}@sqlserver:1433/catalog_service"
       SQS_ENDPOINT_URL: "http://elasticmq:9324"
       PRICING_QUEUE_URL: "http://elasticmq:9324/000000000000/pricing-invalidation-queue"
+      REDIS_URL: "redis://:${REDIS_PASSWORD}@redis:6379/0"
       CORS_ORIGINS: '["http://localhost:5173"]'
     ports:
       - "5004:5004"
@@ -88,15 +90,19 @@ services:
         condition: service_completed_successfully
       elasticmq:
         condition: service_started
+      redis:
+        condition: service_healthy
 
   inventory-service:
     build:
-      context: ../services/inventory-service
+      context: ..
+      dockerfile: services/inventory-service/Dockerfile
     environment:
       DATABASE_URL: "mssql+pymssql://sa:${MSSQL_SA_PASSWORD}@sqlserver:1433/inventory_service"
       SQS_ENDPOINT_URL: "http://elasticmq:9324"
       RESERVATION_QUEUE_URL: "http://elasticmq:9324/000000000000/inventory-reservation-queue"
       ORDER_STATUS_QUEUE_URL: "http://elasticmq:9324/000000000000/order-status-queue"
+      REDIS_URL: "redis://:${REDIS_PASSWORD}@redis:6379/0"
       CORS_ORIGINS: '["http://localhost:5173"]'
     ports:
       - "5005:5005"
@@ -105,45 +111,57 @@ services:
         condition: service_completed_successfully
       elasticmq:
         condition: service_started
+      redis:
+        condition: service_healthy
 
   # Saga consumer: reserves stock for order.created events, publishes the
   # result back to order-status-queue. Same image as inventory-service, just
   # running the polling loop instead of gunicorn.
   inventory-service-consumer:
     build:
-      context: ../services/inventory-service
+      context: ..
+      dockerfile: services/inventory-service/Dockerfile
     command: ["python", "-m", "app.consumer"]
     environment:
       DATABASE_URL: "mssql+pymssql://sa:${MSSQL_SA_PASSWORD}@sqlserver:1433/inventory_service"
       SQS_ENDPOINT_URL: "http://elasticmq:9324"
       RESERVATION_QUEUE_URL: "http://elasticmq:9324/000000000000/inventory-reservation-queue"
       ORDER_STATUS_QUEUE_URL: "http://elasticmq:9324/000000000000/order-status-queue"
+      REDIS_URL: "redis://:${REDIS_PASSWORD}@redis:6379/0"
     depends_on:
       sqlserver-init:
         condition: service_completed_successfully
       elasticmq:
         condition: service_started
+      redis:
+        condition: service_healthy
 
   supplier-service:
     build:
-      context: ../services/supplier-service
+      context: ..
+      dockerfile: services/supplier-service/Dockerfile
     environment:
       DATABASE_URL: "mssql+pymssql://sa:${MSSQL_SA_PASSWORD}@sqlserver:1433/supplier_service"
+      REDIS_URL: "redis://:${REDIS_PASSWORD}@redis:6379/0"
       CORS_ORIGINS: '["http://localhost:5173"]'
     ports:
       - "5001:5001"
     depends_on:
       sqlserver-init:
         condition: service_completed_successfully
+      redis:
+        condition: service_healthy
 
   order-service:
     build:
-      context: ../services/order-service
+      context: ..
+      dockerfile: services/order-service/Dockerfile
     environment:
       DATABASE_URL: "mssql+pymssql://sa:${MSSQL_SA_PASSWORD}@sqlserver:1433/order_service"
       SQS_ENDPOINT_URL: "http://elasticmq:9324"
       RESERVATION_QUEUE_URL: "http://elasticmq:9324/000000000000/inventory-reservation-queue"
       ORDER_STATUS_QUEUE_URL: "http://elasticmq:9324/000000000000/order-status-queue"
+      REDIS_URL: "redis://:${REDIS_PASSWORD}@redis:6379/0"
       CORS_ORIGINS: '["http://localhost:5173"]'
     ports:
       - "5002:5002"
@@ -152,24 +170,30 @@ services:
         condition: service_completed_successfully
       elasticmq:
         condition: service_started
+      redis:
+        condition: service_healthy
 
   # Saga consumer: applies inventory.reserved / inventory.reservation_failed
   # events to the matching order. Same image as order-service, just running
   # the polling loop instead of gunicorn.
   order-service-consumer:
     build:
-      context: ../services/order-service
+      context: ..
+      dockerfile: services/order-service/Dockerfile
     command: ["python", "-m", "app.consumer"]
     environment:
       DATABASE_URL: "mssql+pymssql://sa:${MSSQL_SA_PASSWORD}@sqlserver:1433/order_service"
       SQS_ENDPOINT_URL: "http://elasticmq:9324"
       RESERVATION_QUEUE_URL: "http://elasticmq:9324/000000000000/inventory-reservation-queue"
       ORDER_STATUS_QUEUE_URL: "http://elasticmq:9324/000000000000/order-status-queue"
+      REDIS_URL: "redis://:${REDIS_PASSWORD}@redis:6379/0"
     depends_on:
       sqlserver-init:
         condition: service_completed_successfully
       elasticmq:
         condition: service_started
+      redis:
+        condition: service_healthy
 
   ingestion-service:
     build:
@@ -179,6 +203,7 @@ services:
       SQS_ENDPOINT_URL: "http://elasticmq:9324"
       AI_VALIDATION_QUEUE_URL: "http://elasticmq:9324/000000000000/ai-validation-queue"
       VALIDATION_RESULT_QUEUE_URL: "http://elasticmq:9324/000000000000/validation-result-queue"
+      REDIS_URL: "redis://:${REDIS_PASSWORD}@redis:6379/0"
       CORS_ORIGINS: '["http://localhost:5173"]'
     ports:
       - "5003:5003"
@@ -187,6 +212,8 @@ services:
         condition: service_healthy
       elasticmq:
         condition: service_started
+      redis:
+        condition: service_healthy
 
   # Applies validation.completed events (from ai-validation-worker) back onto
   # their record. Same image as ingestion-service, running the polling loop.
@@ -199,11 +226,14 @@ services:
       SQS_ENDPOINT_URL: "http://elasticmq:9324"
       AI_VALIDATION_QUEUE_URL: "http://elasticmq:9324/000000000000/ai-validation-queue"
       VALIDATION_RESULT_QUEUE_URL: "http://elasticmq:9324/000000000000/validation-result-queue"
+      REDIS_URL: "redis://:${REDIS_PASSWORD}@redis:6379/0"
     depends_on:
       mongodb:
         condition: service_healthy
       elasticmq:
         condition: service_started
+      redis:
+        condition: service_healthy
 
   ai-validation-worker:
     build:
@@ -225,6 +255,7 @@ services:
       INVENTORY_SERVICE_URL: "http://inventory-service:5005"
       SUPPLIER_SERVICE_URL: "http://supplier-service:5001"
       ORDER_SERVICE_URL: "http://order-service:5002"
+      REDIS_URL: "redis://:${REDIS_PASSWORD}@redis:6379/0"
       CORS_ORIGINS: '["http://localhost:5173"]'
     ports:
       - "5050:5000"  # host 5050 — macOS AirPlay Receiver squats on 5000 by default
@@ -233,6 +264,7 @@ services:
       - inventory-service
       - supplier-service
       - order-service
+      - redis
 
 volumes:
   sqlserver-data:
