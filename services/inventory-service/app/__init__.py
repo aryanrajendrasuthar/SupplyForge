@@ -5,7 +5,7 @@ from flask import Flask, g, request
 from flask_cors import CORS
 
 from app.config import settings
-from app.db import Base, make_session_factory
+from app.db import create_all_safely, make_session_factory
 from app.routes import bp as inventory_bp
 
 
@@ -17,7 +17,7 @@ def create_app() -> Flask:
     CORS(app, origins=settings.cors_origins, supports_credentials=True)
 
     engine, session_factory = make_session_factory(settings.database_url)
-    Base.metadata.create_all(engine)
+    create_all_safely(engine)
     app.session_factory = session_factory
 
     @app.before_request

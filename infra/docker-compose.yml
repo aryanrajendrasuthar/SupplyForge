@@ -31,11 +31,32 @@ services:
       timeout: 5s
       retries: 10
 
+  # SQL Server doesn't auto-create a database on first connection the way
+  # SQLite/Mongo do — this runs once to provision each service's database,
+  # then exits. Services depend on it completing, not just sqlserver being
+  # healthy (a live connection still 18456s if the target DB doesn't exist).
+  sqlserver-init:
+    image: mcr.microsoft.com/mssql/server:2022-latest
+    entrypoint: ["/bin/bash", "-c"]
+    command:
+      - |
+        /opt/mssql-tools18/bin/sqlcmd -C -S sqlserver -U sa -P "$$MSSQL_SA_PASSWORD" -Q "
+        IF DB_ID('catalog_service') IS NULL CREATE DATABASE catalog_service;
+        IF DB_ID('inventory_service') IS NULL CREATE DATABASE inventory_service;
+        IF DB_ID('supplier_service') IS NULL CREATE DATABASE supplier_service;
+        IF DB_ID('order_service') IS NULL CREATE DATABASE order_service;
+        "
+    environment:
+      MSSQL_SA_PASSWORD: "${MSSQL_SA_PASSWORD:?set MSSQL_SA_PASSWORD in .env}"
+    depends_on:
+      sqlserver:
+        condition: service_healthy
+
   redis:
     image: redis:7-alpine
     command: ["redis-server", "--requirepass", "${REDIS_PASSWORD:?set REDIS_PASSWORD in .env}"]
     ports:
-      - "6379:6379"
+      - "6380:6379"  # host 6380 to avoid clashing with a locally-installed Redis on 6379
     healthcheck:
       test: ["CMD", "redis-cli", "-a", "${REDIS_PASSWORD}", "ping"]
       interval: 10s
@@ -63,8 +84,8 @@ services:
     ports:
       - "5004:5004"
     depends_on:
-      sqlserver:
-        condition: service_healthy
+      sqlserver-init:
+        condition: service_completed_successfully
       elasticmq:
         condition: service_started
 
@@ -80,8 +101,8 @@ services:
     ports:
       - "5005:5005"
     depends_on:
-      sqlserver:
-        condition: service_healthy
+      sqlserver-init:
+        condition: service_completed_successfully
       elasticmq:
         condition: service_started
 
@@ -98,8 +119,8 @@ services:
       RESERVATION_QUEUE_URL: "http://elasticmq:9324/000000000000/inventory-reservation-queue"
       ORDER_STATUS_QUEUE_URL: "http://elasticmq:9324/000000000000/order-status-queue"
     depends_on:
-      sqlserver:
-        condition: service_healthy
+      sqlserver-init:
+        condition: service_completed_successfully
       elasticmq:
         condition: service_started
 
@@ -112,8 +133,8 @@ services:
     ports:
       - "5001:5001"
     depends_on:
-      sqlserver:
-        condition: service_healthy
+      sqlserver-init:
+        condition: service_completed_successfully
 
   order-service:
     build:
@@ -127,8 +148,8 @@ services:
     ports:
       - "5002:5002"
     depends_on:
-      sqlserver:
-        condition: service_healthy
+      sqlserver-init:
+        condition: service_completed_successfully
       elasticmq:
         condition: service_started
 
@@ -145,8 +166,8 @@ services:
       RESERVATION_QUEUE_URL: "http://elasticmq:9324/000000000000/inventory-reservation-queue"
       ORDER_STATUS_QUEUE_URL: "http://elasticmq:9324/000000000000/order-status-queue"
     depends_on:
-      sqlserver:
-        condition: service_healthy
+      sqlserver-init:
+        condition: service_completed_successfully
       elasticmq:
         condition: service_started
 
@@ -195,6 +216,23 @@ services:
     depends_on:
       elasticmq:
         condition: service_started
+
+  graphql-gateway:
+    build:
+      context: ../gateway/graphql-gateway
+    environment:
+      CATALOG_SERVICE_URL: "http://catalog-service:5004"
+      INVENTORY_SERVICE_URL: "http://inventory-service:5005"
+      SUPPLIER_SERVICE_URL: "http://supplier-service:5001"
+      ORDER_SERVICE_URL: "http://order-service:5002"
+      CORS_ORIGINS: '["http://localhost:5173"]'
+    ports:
+      - "5050:5000"  # host 5050 — macOS AirPlay Receiver squats on 5000 by default
+    depends_on:
+      - catalog-service
+      - inventory-service
+      - supplier-service
+      - order-service
 
 volumes:
   sqlserver-data:

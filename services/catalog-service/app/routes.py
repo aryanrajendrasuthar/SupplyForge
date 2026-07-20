@@ -53,7 +53,7 @@ def list_skus():
     page = max(int(request.args.get("page", 1)), 1)
     page_size = min(max(int(request.args.get("page_size", 25)), 1), 100)
 
-    stmt = select(Sku).where(Sku.is_active.is_(True))
+    stmt = select(Sku).where(Sku.is_active)
     if category:
         stmt = stmt.where(Sku.category == category)
     stmt = stmt.order_by(Sku.sku).offset((page - 1) * page_size).limit(page_size)
