@@ -1,3 +1,4 @@
+import fakeredis
 import pytest
 import requests
 
@@ -21,12 +22,14 @@ class FakeResponse:
 
 @pytest.fixture
 def request_context():
-    # flask-limiter's in-memory backend — no live Redis needed in CI.
+    # flask-limiter's in-memory backend — no live Redis needed in CI. The
+    # SKU cache gets a fakeredis client directly since settings.redis_url
+    # can't double as a redis.Redis.from_url() target once it's "memory://".
     settings.redis_url = "memory://"
     # clients.py reads request.cookies to forward the caller's session to
     # the backend service — needs an active Flask request context, unlike a
     # bare function call.
-    app = create_app()
+    app = create_app(redis_client=fakeredis.FakeRedis())
     with app.test_request_context(headers={"Cookie": "sf_session=test-token"}):
         yield
 
@@ -57,6 +60,21 @@ def test_fetch_sku_returns_none_on_404(monkeypatch, request_context):
     monkeypatch.setattr(requests, "get", fake_get)
 
     assert clients.fetch_sku("NOPE") is None
+
+
+def test_fetch_sku_is_cached_after_first_lookup(monkeypatch, request_context):
+    call_count = 0
+
+    def fake_get(url, params, cookies, timeout):
+        nonlocal call_count
+        call_count += 1
+        return FakeResponse({"sku": "WIDGET-1"})
+
+    monkeypatch.setattr(requests, "get", fake_get)
+
+    assert clients.fetch_sku("WIDGET-1") == {"sku": "WIDGET-1"}
+    assert clients.fetch_sku("WIDGET-1") == {"sku": "WIDGET-1"}
+    assert call_count == 1  # second lookup served from cache, no second REST call
 
 
 def test_fetch_sku_reraises_non_404_errors(monkeypatch, request_context):

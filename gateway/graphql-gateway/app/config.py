@@ -18,10 +18,19 @@ class Settings(BaseSettings):
     supplier_service_url: str = "http://localhost:5001"
     order_service_url: str = "http://localhost:5002"
 
-    # Rate-limit counters. docker-compose supplies the real authenticated
-    # Redis URL via env var; this default assumes a no-auth local Redis.
+    # Rate-limit counters and the SKU pricing cache. docker-compose supplies
+    # the real authenticated Redis URL via env var; this default assumes a
+    # no-auth local Redis.
     redis_url: str = "redis://localhost:6380/0"
     rate_limit_default: str = "200 per hour"
+
+    # ElasticMQ locally (SQS-API-compatible); swap to real AWS SQS in prod by
+    # changing the endpoint only. Only app/consumer.py uses these — it
+    # invalidates the SKU cache when catalog-service publishes
+    # pricing.updated, rather than leaving stale prices to expire off a bare
+    # TTL (see docs/architecture.md).
+    sqs_endpoint_url: str = "http://localhost:9324"
+    pricing_queue_url: str = "http://localhost:9324/000000000000/pricing-invalidation-queue"
 
 
 settings = Settings()

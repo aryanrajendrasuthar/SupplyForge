@@ -266,6 +266,23 @@ services:
       - order-service
       - redis
 
+  # Invalidates the gateway's SKU cache when catalog-service publishes
+  # pricing.updated. Same image as graphql-gateway, just running the
+  # polling loop instead of gunicorn.
+  graphql-gateway-consumer:
+    build:
+      context: ../gateway/graphql-gateway
+    command: ["python", "-m", "app.consumer"]
+    environment:
+      REDIS_URL: "redis://:${REDIS_PASSWORD}@redis:6379/0"
+      SQS_ENDPOINT_URL: "http://elasticmq:9324"
+      PRICING_QUEUE_URL: "http://elasticmq:9324/000000000000/pricing-invalidation-queue"
+    depends_on:
+      redis:
+        condition: service_healthy
+      elasticmq:
+        condition: service_started
+
 volumes:
   sqlserver-data:
   mongodb-data:

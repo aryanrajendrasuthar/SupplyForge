@@ -1,3 +1,4 @@
+import redis
 import sentry_sdk
 from ariadne import graphql_sync
 from ariadne.explorer import ExplorerGraphiQL
@@ -6,18 +7,21 @@ from flask_cors import CORS
 from flask_limiter import Limiter
 from flask_limiter.util import get_remote_address
 
+from app.cache import SkuCache
 from app.config import settings
 from app.schema import schema
 
 _explorer_html = ExplorerGraphiQL().html(None)
 
 
-def create_app() -> Flask:
+def create_app(redis_client=None) -> Flask:
     if settings.sentry_dsn:
         sentry_sdk.init(dsn=settings.sentry_dsn, traces_sample_rate=0.1)
 
     app = Flask(__name__)
     CORS(app, origins=settings.cors_origins, supports_credentials=True)
+
+    app.sku_cache = SkuCache(redis_client or redis.Redis.from_url(settings.redis_url))
 
     Limiter(
         app=app,

@@ -1,5 +1,5 @@
 import requests
-from flask import request
+from flask import current_app, request
 
 from app.config import settings
 
@@ -39,7 +39,14 @@ def fetch_skus(category: str | None = None) -> list[dict]:
 
 
 def fetch_sku(sku: str) -> dict | None:
-    return _get_or_none(settings.catalog_service_url, f"/skus/{sku}")
+    cached = current_app.sku_cache.get(sku)
+    if cached is not None:
+        return cached
+
+    result = _get_or_none(settings.catalog_service_url, f"/skus/{sku}")
+    if result is not None:
+        current_app.sku_cache.set(sku, result)
+    return result
 
 
 def create_sku(payload: dict) -> dict:
@@ -80,3 +87,11 @@ def fetch_order(order_id: int) -> dict | None:
 
 def create_order(payload: dict) -> dict:
     return _post(settings.order_service_url, "/orders", payload)
+
+
+def ship_order(order_id: int) -> dict:
+    return _post(settings.order_service_url, f"/orders/{order_id}/ship", {})
+
+
+def deliver_order(order_id: int) -> dict:
+    return _post(settings.order_service_url, f"/orders/{order_id}/deliver", {})
