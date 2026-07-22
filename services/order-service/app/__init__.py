@@ -11,6 +11,7 @@ from supplyforge_auth import SessionStore
 from app.config import settings
 from app.db import create_all_safely, make_session_factory
 from app.events import SqsEventPublisher, make_sqs_client
+from app.notifications import Notifier
 from app.routes import bp as orders_bp
 
 
@@ -27,6 +28,7 @@ def create_app(redis_client=None) -> Flask:
     app.event_publisher = SqsEventPublisher(
         make_sqs_client(settings.sqs_endpoint_url), settings.reservation_queue_url
     )
+    app.notifier = Notifier()
 
     redis_client = redis_client or redis.Redis.from_url(settings.redis_url)
     app.session_store = SessionStore(redis_client)

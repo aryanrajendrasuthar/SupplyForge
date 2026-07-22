@@ -22,6 +22,18 @@ const CREATE_MUTATION = `
   }
 `;
 
+const SHIP_MUTATION = `
+  mutation ShipOrder($id: Int!) {
+    shipOrder(id: $id) { id status }
+  }
+`;
+
+const DELIVER_MUTATION = `
+  mutation DeliverOrder($id: Int!) {
+    deliverOrder(id: $id) { id status }
+  }
+`;
+
 export function OrdersView() {
   const [orders, setOrders] = useState<Order[]>([]);
   const [error, setError] = useState<string | null>(null);
@@ -35,6 +47,26 @@ export function OrdersView() {
   };
 
   useEffect(load, []);
+
+  const handleShip = async (id: number) => {
+    setError(null);
+    try {
+      await graphqlRequest(SHIP_MUTATION, { id });
+      load();
+    } catch (err) {
+      setError((err as Error).message);
+    }
+  };
+
+  const handleDeliver = async (id: number) => {
+    setError(null);
+    try {
+      await graphqlRequest(DELIVER_MUTATION, { id });
+      load();
+    } catch (err) {
+      setError((err as Error).message);
+    }
+  };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -69,6 +101,7 @@ export function OrdersView() {
               <th>Customer</th>
               <th>Status</th>
               <th>Line items</th>
+              <th>Actions</th>
             </tr>
           </thead>
           <tbody>
@@ -78,6 +111,14 @@ export function OrdersView() {
                 <td>{o.customerEmail}</td>
                 <td><StatusBadge status={o.status} /></td>
                 <td>{o.lineItems.map((li) => `${li.sku} ×${li.quantity} (${li.warehouseCode})`).join(", ")}</td>
+                <td>
+                  {o.status === "confirmed" && (
+                    <button type="button" onClick={() => handleShip(o.id)}>Mark shipped</button>
+                  )}
+                  {o.status === "shipped" && (
+                    <button type="button" onClick={() => handleDeliver(o.id)}>Mark delivered</button>
+                  )}
+                </td>
               </tr>
             ))}
           </tbody>

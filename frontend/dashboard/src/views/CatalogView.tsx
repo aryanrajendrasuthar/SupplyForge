@@ -8,14 +8,16 @@ const LIST_QUERY = `
       sku
       name
       category
+      imageUrl
+      technicalSpecs { key value }
       pricingTiers { minQuantity unitPrice }
     }
   }
 `;
 
 const CREATE_MUTATION = `
-  mutation CreateSku($sku: String!, $name: String!, $category: String!) {
-    createSku(sku: $sku, name: $name, category: $category) {
+  mutation CreateSku($sku: String!, $name: String!, $category: String!, $imageUrl: String) {
+    createSku(sku: $sku, name: $name, category: $category, imageUrl: $imageUrl) {
       sku
     }
   }
@@ -24,7 +26,7 @@ const CREATE_MUTATION = `
 export function CatalogView() {
   const [skus, setSkus] = useState<Sku[]>([]);
   const [error, setError] = useState<string | null>(null);
-  const [form, setForm] = useState({ sku: "", name: "", category: "" });
+  const [form, setForm] = useState({ sku: "", name: "", category: "", imageUrl: "" });
   const [submitting, setSubmitting] = useState(false);
 
   const load = () => {
@@ -40,8 +42,8 @@ export function CatalogView() {
     setSubmitting(true);
     setError(null);
     try {
-      await graphqlRequest(CREATE_MUTATION, form);
-      setForm({ sku: "", name: "", category: "" });
+      await graphqlRequest(CREATE_MUTATION, { ...form, imageUrl: form.imageUrl || null });
+      setForm({ sku: "", name: "", category: "", imageUrl: "" });
       load();
     } catch (err) {
       setError((err as Error).message);
@@ -61,19 +63,33 @@ export function CatalogView() {
         <table className="data-table">
           <thead>
             <tr>
+              <th>Image</th>
               <th>SKU</th>
               <th>Name</th>
               <th>Category</th>
               <th>Base price</th>
+              <th>Specs</th>
             </tr>
           </thead>
           <tbody>
             {skus.map((s) => (
               <tr key={s.sku}>
+                <td>
+                  {s.imageUrl ? (
+                    <img src={s.imageUrl} alt={s.name} style={{ width: 32, height: 32, objectFit: "cover", borderRadius: 4 }} />
+                  ) : (
+                    "—"
+                  )}
+                </td>
                 <td>{s.sku}</td>
                 <td>{s.name}</td>
                 <td>{s.category}</td>
                 <td>{s.pricingTiers[0]?.unitPrice ?? "—"}</td>
+                <td>
+                  {s.technicalSpecs.length > 0
+                    ? s.technicalSpecs.map((spec) => `${spec.key}: ${spec.value}`).join(", ")
+                    : "—"}
+                </td>
               </tr>
             ))}
           </tbody>
@@ -100,6 +116,11 @@ export function CatalogView() {
             value={form.category}
             onChange={(e) => setForm({ ...form, category: e.target.value })}
             required
+          />
+          <input
+            placeholder="Image URL (optional)"
+            value={form.imageUrl}
+            onChange={(e) => setForm({ ...form, imageUrl: e.target.value })}
           />
         </div>
         <div className="form-actions">

@@ -14,13 +14,26 @@ class FakeEventPublisher:
         self.events.append((event_type, payload, correlation_id))
 
 
+class FakeNotifier:
+    def __init__(self):
+        self.sent: list[tuple[str, str, str]] = []
+
+    def send(self, to: str, subject: str, body: str) -> None:
+        self.sent.append((to, subject, body))
+
+
 @pytest.fixture
 def event_publisher():
     return FakeEventPublisher()
 
 
 @pytest.fixture
-def app(tmp_path, event_publisher):
+def notifier():
+    return FakeNotifier()
+
+
+@pytest.fixture
+def app(tmp_path, event_publisher, notifier):
     # SQLite (file-backed, not :memory:, so every connection in the pool sees
     # the same data) stands in for SQL Server in tests — no live DB needed in CI.
     settings.database_url = f"sqlite:///{tmp_path / 'test.db'}"
@@ -28,6 +41,7 @@ def app(tmp_path, event_publisher):
     settings.redis_url = "memory://"
     flask_app = create_app(redis_client=fakeredis.FakeRedis())
     flask_app.event_publisher = event_publisher
+    flask_app.notifier = notifier
     flask_app.config.update(TESTING=True)
     yield flask_app
     flask_app.session_factory.remove()

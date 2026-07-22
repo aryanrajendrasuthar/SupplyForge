@@ -59,6 +59,8 @@ def _build_sku(payload: SkuCreate) -> Sku:
         description=payload.description,
         category=payload.category,
         compliance_certs=payload.compliance_certs,
+        image_url=payload.image_url,
+        technical_specs=payload.technical_specs,
         pricing_tiers=[
             PricingTier(min_quantity=t.min_quantity, unit_price=t.unit_price) for t in payload.pricing_tiers
         ],
@@ -70,6 +72,8 @@ def _apply_update(sku: Sku, payload: SkuCreate, db: Session) -> None:
     sku.description = payload.description
     sku.category = payload.category
     sku.compliance_certs = payload.compliance_certs
+    sku.image_url = payload.image_url
+    sku.technical_specs = payload.technical_specs
     if payload.pricing_tiers:
         # Flush the deletes before inserting the replacements — see the same
         # comment in app/routes.py::update_sku for why this ordering matters.

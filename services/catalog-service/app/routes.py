@@ -34,6 +34,8 @@ def create_sku():
         description=payload.description,
         category=payload.category,
         compliance_certs=payload.compliance_certs,
+        image_url=payload.image_url,
+        technical_specs=payload.technical_specs,
         pricing_tiers=[
             PricingTier(min_quantity=t.min_quantity, unit_price=t.unit_price) for t in payload.pricing_tiers
         ],

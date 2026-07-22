@@ -19,6 +19,23 @@ def test_create_sku_returns_201_with_body(client):
     assert body["pricing_tiers"] == [{"min_quantity": 1, "unit_price": "9.99"}]
 
 
+def test_create_sku_stores_image_url_and_technical_specs(client):
+    response = _create_sku(
+        client, image_url="https://cdn.example.com/widget.png", technical_specs={"weight": "2.5kg"}
+    )
+    assert response.status_code == 201
+    body = response.get_json()
+    assert body["image_url"] == "https://cdn.example.com/widget.png"
+    assert body["technical_specs"] == {"weight": "2.5kg"}
+
+
+def test_create_sku_defaults_image_url_and_technical_specs(client):
+    response = _create_sku(client)
+    body = response.get_json()
+    assert body["image_url"] is None
+    assert body["technical_specs"] == {}
+
+
 def test_create_sku_rejects_duplicate(client):
     _create_sku(client)
     response = _create_sku(client)

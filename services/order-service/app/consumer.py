@@ -10,19 +10,21 @@ Run with: python -m app.consumer
 from app import create_app
 from app.config import settings
 from app.events import delete_message, make_sqs_client, receive_messages
+from app.notifications import Notifier
 from app.saga import handle_reservation_result
 
 
 def run() -> None:
     app = create_app()
     sqs_client = make_sqs_client(settings.sqs_endpoint_url)
+    notifier = Notifier()
 
     with app.app_context():
         db = app.session_factory()
         print(f"order-service consumer polling {settings.order_status_queue_url}")
         while True:
             for message in receive_messages(sqs_client, settings.order_status_queue_url):
-                handle_reservation_result(db, message["body"])
+                handle_reservation_result(db, notifier, message["body"])
                 delete_message(sqs_client, settings.order_status_queue_url, message["receipt_handle"])
 
 

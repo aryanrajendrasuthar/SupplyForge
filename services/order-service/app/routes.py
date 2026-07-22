@@ -4,7 +4,7 @@ from sqlalchemy import select
 from supplyforge_auth import require_session
 
 from app.models import Order
-from app.saga import create_order
+from app.saga import InvalidTransitionError, create_order, deliver_order, ship_order
 from app.schemas import OrderCreate
 
 bp = Blueprint("orders", __name__, url_prefix="/orders")
@@ -57,3 +57,29 @@ def list_orders():
         stmt = stmt.where(Order.status == status)
     orders = g.db.execute(stmt).scalars().all()
     return jsonify([_order_out(o) for o in orders])
+
+
+@bp.post("/<int:order_id>/ship")
+@require_session()
+def ship(order_id: int):
+    order = g.db.get(Order, order_id)
+    if order is None:
+        return jsonify({"error": "not found"}), 404
+    try:
+        ship_order(g.db, current_app.notifier, order)
+    except InvalidTransitionError as exc:
+        return jsonify({"error": str(exc)}), 409
+    return jsonify(_order_out(order))
+
+
+@bp.post("/<int:order_id>/deliver")
+@require_session()
+def deliver(order_id: int):
+    order = g.db.get(Order, order_id)
+    if order is None:
+        return jsonify({"error": "not found"}), 404
+    try:
+        deliver_order(g.db, current_app.notifier, order)
+    except InvalidTransitionError as exc:
+        return jsonify({"error": str(exc)}), 409
+    return jsonify(_order_out(order))

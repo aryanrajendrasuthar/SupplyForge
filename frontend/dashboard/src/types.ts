@@ -3,12 +3,19 @@ export interface PricingTier {
   unitPrice: string;
 }
 
+export interface TechnicalSpec {
+  key: string;
+  value: string;
+}
+
 export interface Sku {
   sku: string;
   name: string;
   description: string | null;
   category: string;
   complianceCerts: string[];
+  imageUrl: string | null;
+  technicalSpecs: TechnicalSpec[];
   isActive: boolean;
   pricingTiers: PricingTier[];
 }

@@ -15,7 +15,9 @@ class Order(Base):
 
     id: Mapped[int] = mapped_column(primary_key=True)
     customer_email: Mapped[str] = mapped_column(String(255), index=True)
-    # pending -> confirmed | cancelled, driven by the inventory reservation saga
+    # pending -> confirmed | cancelled (driven by the inventory reservation
+    # saga) -> confirmed -> shipped -> delivered (driven by an operator
+    # marking fulfillment, see app/saga.py's ship_order/deliver_order)
     status: Mapped[str] = mapped_column(String(32), default="pending")
     cancellation_reason: Mapped[str | None] = mapped_column(String(1000), nullable=True)
     correlation_id: Mapped[str] = mapped_column(String(64))

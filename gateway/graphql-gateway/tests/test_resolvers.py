@@ -182,3 +182,33 @@ def test_create_order_mutation_translates_line_items(client, monkeypatch):
     assert result["data"]["createOrder"]["lineItems"] == [
         {"sku": "WIDGET-1", "warehouseCode": "WH1", "quantity": 2}
     ]
+
+
+def test_ship_order_mutation(client, monkeypatch):
+    captured = {}
+
+    def fake_ship_order(order_id):
+        captured["order_id"] = order_id
+        return {"id": order_id, "customer_email": "c@example.com", "status": "shipped", "cancellation_reason": None, "line_items": []}
+
+    monkeypatch.setattr(clients, "ship_order", fake_ship_order)
+
+    result = graphql_query(client, "mutation { shipOrder(id: 1) { id status } }")
+
+    assert captured["order_id"] == 1
+    assert result["data"]["shipOrder"]["status"] == "shipped"
+
+
+def test_deliver_order_mutation(client, monkeypatch):
+    captured = {}
+
+    def fake_deliver_order(order_id):
+        captured["order_id"] = order_id
+        return {"id": order_id, "customer_email": "c@example.com", "status": "delivered", "cancellation_reason": None, "line_items": []}
+
+    monkeypatch.setattr(clients, "deliver_order", fake_deliver_order)
+
+    result = graphql_query(client, "mutation { deliverOrder(id: 1) { id status } }")
+
+    assert captured["order_id"] == 1
+    assert result["data"]["deliverOrder"]["status"] == "delivered"

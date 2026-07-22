@@ -8,12 +8,19 @@ type_defs = """
         unitPrice: String!
     }
 
+    type TechnicalSpec {
+        key: String!
+        value: String!
+    }
+
     type Sku {
         sku: String!
         name: String!
         description: String
         category: String!
         complianceCerts: [String!]!
+        imageUrl: String
+        technicalSpecs: [TechnicalSpec!]!
         isActive: Boolean!
         pricingTiers: [PricingTier!]!
     }
@@ -80,6 +87,11 @@ type_defs = """
         quantity: Int!
     }
 
+    input TechnicalSpecInput {
+        key: String!
+        value: String!
+    }
+
     type Mutation {
         createSku(
             sku: String!
@@ -87,8 +99,12 @@ type_defs = """
             category: String!
             description: String
             complianceCerts: [String!]
+            imageUrl: String
+            technicalSpecs: [TechnicalSpecInput!]
         ): Sku!
         createOrder(customerEmail: String!, lineItems: [LineItemInput!]!): Order!
+        shipOrder(id: Int!): Order!
+        deliverOrder(id: Int!): Order!
         registerSupplier(legalName: String!, contactEmail: String!, contactPhone: String): Supplier!
     }
 """
@@ -167,13 +183,17 @@ def resolve_dashboard_summary(*_):
 
 
 @mutation.field("createSku")
-def resolve_create_sku(*_, sku, name, category, description=None, complianceCerts=None):
+def resolve_create_sku(
+    *_, sku, name, category, description=None, complianceCerts=None, imageUrl=None, technicalSpecs=None
+):
     payload = {
         "sku": sku,
         "name": name,
         "category": category,
         "description": description,
         "compliance_certs": complianceCerts or [],
+        "image_url": imageUrl,
+        "technical_specs": {spec["key"]: spec["value"] for spec in (technicalSpecs or [])},
     }
     return clients.create_sku(payload)
 
@@ -190,6 +210,16 @@ def resolve_create_order(*_, customerEmail, lineItems):
     return clients.create_order(payload)
 
 
+@mutation.field("shipOrder")
+def resolve_ship_order(*_, id):
+    return clients.ship_order(id)
+
+
+@mutation.field("deliverOrder")
+def resolve_deliver_order(*_, id):
+    return clients.deliver_order(id)
+
+
 @mutation.field("registerSupplier")
 def resolve_register_supplier(*_, legalName, contactEmail, contactPhone=None):
     payload = {"legal_name": legalName, "contact_email": contactEmail, "contact_phone": contactPhone}
@@ -198,6 +228,10 @@ def resolve_register_supplier(*_, legalName, contactEmail, contactPhone=None):
 
 # REST responses come back snake_case; map each to its camelCase GraphQL field.
 sku_type.set_field("complianceCerts", lambda obj, info: obj["compliance_certs"])
+sku_type.set_field("imageUrl", lambda obj, info: obj["image_url"])
+sku_type.set_field(
+    "technicalSpecs", lambda obj, info: [{"key": k, "value": v} for k, v in obj["technical_specs"].items()]
+)
 sku_type.set_field("isActive", lambda obj, info: obj["is_active"])
 sku_type.set_field("pricingTiers", lambda obj, info: obj["pricing_tiers"])
 

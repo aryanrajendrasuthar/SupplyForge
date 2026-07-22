@@ -19,6 +19,13 @@ class Sku(Base):
     description: Mapped[str | None] = mapped_column(String(2000), nullable=True)
     category: Mapped[str] = mapped_column(String(128), index=True)
     compliance_certs: Mapped[list] = mapped_column(JSON, default=list)
+    # References an external URL rather than storing bytes — no object
+    # storage (Cloudflare R2) is wired yet, same stated tradeoff as
+    # supplier-service's documents (see docs/project-plan.md §1).
+    image_url: Mapped[str | None] = mapped_column(String(2048), nullable=True)
+    # Free-form key/value spec sheet (dimensions, weight, materials, etc.) —
+    # deliberately unstructured since specs vary wildly by product category.
+    technical_specs: Mapped[dict] = mapped_column(JSON, default=dict)
     is_active: Mapped[bool] = mapped_column(default=True)
     created_at: Mapped[datetime] = mapped_column(default=_utcnow)
     updated_at: Mapped[datetime] = mapped_column(default=_utcnow, onupdate=_utcnow)

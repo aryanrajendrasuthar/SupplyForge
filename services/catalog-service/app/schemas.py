@@ -21,6 +21,8 @@ class SkuCreate(BaseModel):
     description: str | None = None
     category: str = Field(min_length=1, max_length=128)
     compliance_certs: list[str] = []
+    image_url: str | None = Field(default=None, max_length=2048)
+    technical_specs: dict[str, str] = {}
     pricing_tiers: list[PricingTierIn] = []
 
 
@@ -29,6 +31,8 @@ class SkuUpdate(BaseModel):
     description: str | None = None
     category: str | None = Field(default=None, min_length=1, max_length=128)
     compliance_certs: list[str] | None = None
+    image_url: str | None = Field(default=None, max_length=2048)
+    technical_specs: dict[str, str] | None = None
     pricing_tiers: list[PricingTierIn] | None = None
     is_active: bool | None = None
 
@@ -41,6 +45,8 @@ class SkuOut(BaseModel):
     description: str | None
     category: str
     compliance_certs: list[str]
+    image_url: str | None
+    technical_specs: dict[str, str]
     is_active: bool
     pricing_tiers: list[PricingTierOut]
 
